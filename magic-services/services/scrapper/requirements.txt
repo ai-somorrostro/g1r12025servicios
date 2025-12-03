@@ -1,1 +1,14 @@
 requests>=2.31.0
+
+# Librería principal
+sentence-transformers==3.0.1
+
+# Dependencias críticas
+torch==2.2.1
+transformers==4.40.2
+
+# Utilidades adicionales que suelen ser necesarias
+numpy==1.26.4
+scikit-learn==1.5.0
+scipy==1.13.1
+tqdm==4.66.4
