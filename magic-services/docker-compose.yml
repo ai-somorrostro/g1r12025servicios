@@ -1,0 +1,29 @@
+services:
+  scrapper:
+    build:
+      context: ./services/scrapper
+    container_name: magic-scrapper
+    # Mount local dataset and log folders so results persist on host
+    volumes:
+      - ./services/scrapper/bulk-data:/app/bulk-data
+      - ./services/scrapper/scryfall_scraper.log:/app/scryfall_scraper.log
+    environment:
+      - PYTHONUNBUFFERED=1
+    # Cron daemon runs continuously; no restart policy needed
+    # Logs from cron jobs will be appended to scryfall_scraper.log on the host
+
+  # Placeholder for the `api` service. When the API is ready, add a service here:
+  # api:
+  #   build:
+  #     context: ./services/api
+  #   container_name: magic-api
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     # Mount the scrapper output so the API can read and modify the JSON files
+  #     - ./services/scrapper/bulk-data:/data/bulk-data
+  #     # Mount api.log so requests get logged on the host
+  #     - ./services/api/api.log:/app/api.log
+  #   depends_on:
+  #     - scrapper
+
