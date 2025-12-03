@@ -10,6 +10,10 @@ import time
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 
+from sentence_transformers import SentenceTransformer
+
+# Cargar el modelo de embeddings una sola vez
+model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
 
 def _parse_mana_cost_to_cmc(mana_cost: Optional[str]) -> int:
     """
@@ -88,6 +92,40 @@ def filtrar_carta(carta: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "price_usd_etched": carta.get("prices", {}).get("usd_etched"),
                 "cardmarket_url": carta.get("purchase_uris", {}).get("cardmarket")
             }
+
+            # Concatenar todos los campos excepto los excluidos
+            concat_text = " ".join([
+                f"oracle_id: {carta_filtrada.get('oracle_id')}",
+                f"parent_id: {carta_filtrada.get('parent_id')}",
+                f"face_number: {carta_filtrada.get('face_number')}",
+                f"name: {carta_filtrada.get('name')}",
+                f"lang: {carta_filtrada.get('lang')}",
+                f"released_at: {carta_filtrada.get('released_at')}",
+                f"image_png: {carta_filtrada.get('image_png')}",
+                f"mana_cost: {carta_filtrada.get('mana_cost')}",
+                f"cmc: {carta_filtrada.get('cmc')}",
+                f"type_line: {carta_filtrada.get('type_line')}",
+                f"oracle_text: {carta_filtrada.get('oracle_text')}",
+                f"power: {carta_filtrada.get('power')}",
+                f"toughness: {carta_filtrada.get('toughness')}",
+                f"colors: {carta_filtrada.get('colors')}",
+                f"color_identity: {carta_filtrada.get('color_identity')}",
+                f"keywords: {carta_filtrada.get('keywords')}",
+                f"produced_mana: {carta_filtrada.get('produced_mana')}",
+                f"commander_legality: {carta_filtrada.get('commander_legality')}",
+                f"game_changer: {carta_filtrada.get('game_changer')}",
+                f"set_name: {carta_filtrada.get('set_name')}",
+                f"rarity: {carta_filtrada.get('rarity')}",
+                f"artist: {carta_filtrada.get('artist')}",
+                f"full_art: {carta_filtrada.get('full_art')}",
+                f"booster: {carta_filtrada.get('booster')}",
+                f"price_usd: {carta_filtrada.get('price_usd')}"
+            ])
+
+            # Generar embedding
+            vector = model.encode(concat_text).tolist()
+            carta_filtrada["embedding"] = vector
+
             cartas_resultado.append(carta_filtrada)
     else:
         # Carta de una sola cara
