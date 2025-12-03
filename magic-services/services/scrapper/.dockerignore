@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+env/
+.git/
+*.log
+bulk-datasets/
+*.json
+
+# Exclude local virtualenvs and editor files
+.vscode/
+.idea/
