@@ -1,2 +1,0 @@
-# Run scryfall scrapper every 10 minutes
-*/10 * * * * cd /app && python scryfall_scrapper.py >> scryfall_scraper.log 2>&1
