@@ -209,7 +209,11 @@ def descargar_cartas_scryfall() -> Optional[str]:
     script_dir: Path = Path(__file__).parent
     bulk_data_dir: Path = script_dir / "bulk-data"
     bulk_data_dir.mkdir(exist_ok=True)
-    log_file_path: Path = script_dir / "scryfall_scraper_log/scryfall_scraper.log"
+    
+    log_dir: Path = script_dir / "scryfall_scraper_log"
+    log_dir.mkdir(exist_ok=True)  # crea la carpeta si no existe
+    log_file_path: Path = log_dir / "scryfall_scraper.log"
+
 
     # Inicializar log manager en la ruta correcta
     logger = LogManager(str(log_file_path))
@@ -462,6 +466,6 @@ if __name__ == "__main__":
                     print("\n✗ El scraping falló en esta iteración. Revisa el log.")
 
                 print("Esperando 10 minutos hasta la siguiente ejecución...\n")
-                time.sleep(10 * 60)
+                time.sleep(100 * 60)
         except KeyboardInterrupt:
             print("\nEjecución interrumpida por el usuario. Saliendo...")
