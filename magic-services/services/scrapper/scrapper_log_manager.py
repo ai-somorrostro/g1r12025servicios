@@ -15,7 +15,7 @@ class LogManager:
     Registra todas las operaciones en un archivo de texto.
     """
     
-    def __init__(self, log_file="scryfall_scraper.log"):
+    def __init__(self, log_file="scryfall_scraper_log/scryfall_scraper.log"):
         """
         Inicializa el gestor de logs.
         

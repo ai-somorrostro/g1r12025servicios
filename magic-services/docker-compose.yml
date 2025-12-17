@@ -6,7 +6,7 @@ services:
     # Mount local dataset and log folders so results persist on host
     volumes:
       - ./services/scrapper/bulk-data:/app/bulk-data
-      - ./services/scrapper/scryfall_scraper.log:/app/scryfall_scraper.log
+      - ./services/scrapper/scryfall_scraper_log:/app/scryfall_scraper_log
     environment:
       - PYTHONUNBUFFERED=1
     # Cron daemon runs continuously; no restart policy needed
@@ -22,7 +22,7 @@ services:
       # Mount the scrapper output so the API can read and modify the JSON files
       - ./services/scrapper/bulk-data:/data/bulk-data
       # Mount api.log so requests get logged on the host
-      - ./services/api/api.log:/app/api.log
+      - ./services/api/api_log:/app/api_log
     depends_on:
       - scrapper
 
