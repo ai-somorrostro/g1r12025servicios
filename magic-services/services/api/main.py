@@ -12,7 +12,7 @@ app = FastAPI(title="Magic Scrapper API", version="0.1")
 BULK_DATA_DIR = Path("/data/bulk-data")
 
 # Inicializar logger de la API (archivo en la carpeta del servicio)
-api_log_path = Path(__file__).parent / "api.log"
+api_log_path = Path(file).parent / "api_log/api.log"
 logger = APILogManager(str(api_log_path))
 
 

@@ -209,7 +209,7 @@ def descargar_cartas_scryfall() -> Optional[str]:
     script_dir: Path = Path(__file__).parent
     bulk_data_dir: Path = script_dir / "bulk-data"
     bulk_data_dir.mkdir(exist_ok=True)
-    log_file_path: Path = script_dir / "scryfall_scraper.log"
+    log_file_path: Path = script_dir / "scryfall_scraper_log/scryfall_scraper.log"
 
     # Inicializar log manager en la ruta correcta
     logger = LogManager(str(log_file_path))
