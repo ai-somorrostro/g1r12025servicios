@@ -3,6 +3,7 @@ services:
     build:
       context: ./services/scrapper
     container_name: magic-scrapper
+    image: ghcr.io/ai-somorrostro/g1r12025servicios/scrapper:1.0.0
     # Mount local dataset and log folders so results persist on host
     volumes:
       - ./services/scrapper/bulk-data:/app/bulk-data
@@ -16,6 +17,7 @@ services:
     build:
       context: ./services/api
     container_name: magic-api
+    image: ghcr.io/ai-somorrostro/g1r12025servicios/api:1.0.0
     ports:
       - "8000:8000"
     volumes:
