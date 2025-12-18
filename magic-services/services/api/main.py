@@ -1,10 +1,11 @@
 from fastapi import FastAPI, HTTPException, Query, Body, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pathlib import Path
 import json
 from typing import Any, Dict, List, Optional
 import os
 from api_log_manager import APILogManager
+from datetime import datetime
 
 app = FastAPI(title="Magic Scrapper API", version="0.1")
 
@@ -12,7 +13,7 @@ app = FastAPI(title="Magic Scrapper API", version="0.1")
 BULK_DATA_DIR = Path("/data/bulk-data")
 
 # Inicializar logger de la API (archivo en la carpeta del servicio)
-api_log_path = Path(file).parent / "api_log/api.log"
+api_log_path = Path(__file__).parent / "api_log" / f"api_{datetime.now().strftime('%Y-%m-%d')}.log"
 logger = APILogManager(str(api_log_path))
 
 
@@ -157,6 +158,34 @@ async def update_card(
         raise HTTPException(status_code=500, detail=f"Error al actualizar el archivo: {e}")
 
     return {"status": "success", "updated": updated_count, "file": latest.name}
+
+def _latest_log_file(directory: Path) -> Optional[Path]:
+    if not directory.exists() or not directory.is_dir():
+        return None
+    files = list(directory.glob("api_*.log"))
+    if not files:
+        return None
+    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return files[0]
+
+@app.get("/logs_data")
+async def get_logs_data():
+    """Devuelve el contenido completo del archivo de logs api.log como texto."""
+    latest_log_file = _latest_log_file(Path(__file__).parent / "api_log")
+
+    if not latest_log_file.exists():
+        raise HTTPException(status_code=404, detail="El archivo de log no existe")
+    
+    # Devolver como texto plano
+    try:
+        with open(latest_log_file, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al leer el archivo de log: {e}")
+
+    # Devolver como texto plano
+  
+
 
 @app.get("/health")
 async def health():

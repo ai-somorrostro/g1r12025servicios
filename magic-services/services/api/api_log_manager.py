@@ -18,7 +18,8 @@ class APILogManager:
 
     def __init__(self, log_file: Optional[str] = None):
         if log_file is None:
-            log_file = "api_log/api.log"
+            log_file = "api_log/api_" + datetime.now().strftime("%Y-%m-%d") + ".log"
+
         self.log_file_path = Path(log_file)
         # asegurar directorio
         if not self.log_file_path.parent.exists():
