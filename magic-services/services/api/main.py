@@ -171,22 +171,19 @@ def _latest_log_file(directory: Path) -> Optional[Path]:
 
 @app.get("/logs-data")
 async def get_logs_data():
-    """Devuelve el contenido completo del archivo de logs api.log como texto."""
+    """Devuelve el contenido del archivo de logs más reciente en formato JSON."""
     latest_log_file = _latest_log_file(Path(__file__).parent / "api_log")
 
-    if not latest_log_file.exists():
+    if latest_log_file is None or not latest_log_file.exists():
         raise HTTPException(status_code=404, detail="El archivo de log no existe")
-    # Expresión regular para capturar los campos 
-    # Quitar espacios y saltos 
-    line = line.strip()
-    # Separar en bloques 
-    timestamp = line.split("]")[0].strip("[") 
-    level = line.split("]")[1].strip(" [") 
-    rest = line.split("]")[2].strip()
 
-    
+    # Patrón regex para parsear las líneas de log
+    # Formato: [timestamp] [level] ip method path ? -> status | body=...
+    pattern = re.compile(
+        r"\[(?P<timestamp>[^\]]+)\]\s+\[(?P<level>[^\]]+)\]\s+(?P<ip>\S+)\s+(?P<method>\S+)\s+(?P<path>\S+)\s+(?P<query>\S*)\s+->\s+(?P<status>\d+)\s+\|\s+body=(?P<body>.*)"
+    )
+
     parsed_logs = []
-    # Devolver como texto plano
     try:
         with open(latest_log_file, "r", encoding="utf-8") as f:
             for line in f:
@@ -201,16 +198,16 @@ async def get_logs_data():
                         "ip": match.group("ip"),
                         "method": match.group("method"),
                         "path": match.group("path"),
+                        "query": match.group("query") or None,
                         "status": int(match.group("status")),
+                        "body": match.group("body") or None,
                     }
                     parsed_logs.append(log_entry)
-                    
-        return json.dumps(parsed_logs, indent=2, ensure_ascii=False)
+
+        return JSONResponse(content={"logs": parsed_logs, "file": latest_log_file.name})
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al leer el archivo de log: {e}")
-
-    # Devolver como texto plano
   
 
 
