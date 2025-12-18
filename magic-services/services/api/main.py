@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 import os
 from api_log_manager import APILogManager
 from datetime import datetime
+import re
 
 app = FastAPI(title="Magic Scrapper API", version="0.1")
 
@@ -168,18 +169,44 @@ def _latest_log_file(directory: Path) -> Optional[Path]:
     files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
     return files[0]
 
-@app.get("/logs_data")
+@app.get("/logs-data")
 async def get_logs_data():
     """Devuelve el contenido completo del archivo de logs api.log como texto."""
     latest_log_file = _latest_log_file(Path(__file__).parent / "api_log")
 
     if not latest_log_file.exists():
         raise HTTPException(status_code=404, detail="El archivo de log no existe")
+    # Expresión regular para capturar los campos 
+    # Quitar espacios y saltos 
+    line = line.strip()
+    # Separar en bloques 
+    timestamp = line.split("]")[0].strip("[") 
+    level = line.split("]")[1].strip(" [") 
+    rest = line.split("]")[2].strip()
+
     
+    parsed_logs = []
     # Devolver como texto plano
     try:
         with open(latest_log_file, "r", encoding="utf-8") as f:
-            return f.read()
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                match = pattern.match(line)
+                if match:
+                    log_entry = {
+                        "timestamp": match.group("timestamp"),
+                        "level": match.group("level"),
+                        "ip": match.group("ip"),
+                        "method": match.group("method"),
+                        "path": match.group("path"),
+                        "status": int(match.group("status")),
+                    }
+                    parsed_logs.append(log_entry)
+                    
+        return json.dumps(parsed_logs, indent=2, ensure_ascii=False)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al leer el archivo de log: {e}")
 
