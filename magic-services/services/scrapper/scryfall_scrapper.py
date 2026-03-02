@@ -12,8 +12,12 @@ from pathlib import Path
 
 from sentence_transformers import SentenceTransformer
 
-# Cargar el modelo de embeddings una sola vez
-model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
+
+def _cargar_modelo() -> SentenceTransformer:
+    """Carga el modelo de embeddings bajo demanda."""
+    print("Cargando modelo de embeddings...")
+    return SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
+
 
 def _parse_mana_cost_to_cmc(mana_cost: Optional[str]) -> int:
     """
@@ -42,7 +46,7 @@ def _parse_mana_cost_to_cmc(mana_cost: Optional[str]) -> int:
 
     return total
 
-def filtrar_carta(carta: Dict[str, Any]) -> List[Dict[str, Any]]:
+def filtrar_carta(carta: Dict[str, Any], model: SentenceTransformer) -> List[Dict[str, Any]]:
     """
     Filtra los campos específicos de una carta según los requerimientos.
     Para cartas de doble cara, devuelve una lista con ambas caras.
@@ -198,7 +202,7 @@ def filtrar_carta(carta: Dict[str, Any]) -> List[Dict[str, Any]]:
 
     return cartas_resultado
 
-def descargar_cartas_scryfall() -> Optional[str]:
+def descargar_cartas_scryfall(model: SentenceTransformer) -> Optional[str]:
     """
     Descarga todas las cartas de Magic: The Gathering desde la API de Scryfall
     y las guarda en un archivo JSON con solo los campos necesarios.
@@ -285,7 +289,7 @@ def descargar_cartas_scryfall() -> Optional[str]:
         
         cartas_filtradas = []
         for carta in cartas:
-            cartas_filtradas.extend(filtrar_carta(carta))  # extend porque puede devolver múltiples caras
+            cartas_filtradas.extend(filtrar_carta(carta, model))  # extend porque puede devolver múltiples caras
         
         logger.success(f"Filtrado completado: {len(cartas_filtradas)} registros procesados (incluyendo caras de cartas dobles)")
         #logger.set_cards_count(len(cartas_filtradas))
@@ -444,8 +448,10 @@ if __name__ == "__main__":
     # - 'loop' -> ejecutar periódicamente cada 10 minutos (comportamiento por defecto)
     mode = os.getenv("SCRAPPER_MODE", "loop").lower()
 
+    model = _cargar_modelo()
+
     if mode == "once":
-        archivo = descargar_cartas_scryfall()
+        archivo = descargar_cartas_scryfall(model)
 
         if archivo:
             print(f"\n✓ Los datos están disponibles en: {archivo}")
@@ -459,7 +465,7 @@ if __name__ == "__main__":
         print("Iniciando modo loop: ejecutando cada 10 minutos. Ctrl+C para detener.")
         try:
             while True:
-                archivo = descargar_cartas_scryfall()
+                archivo = descargar_cartas_scryfall(model)
                 if archivo:
                     print(f"\n✓ Los datos están disponibles en: {archivo}")
                 else:
