@@ -1,5 +1,6 @@
 import requests
 import json
+import hashlib
 
 import os
 from datetime import datetime
@@ -41,6 +42,139 @@ def _parse_mana_cost_to_cmc(mana_cost: Optional[str]) -> int:
         total += 1
 
     return total
+
+def _generar_texto_embedding(carta_filtrada: Dict[str, Any]) -> str:
+    """
+    Genera el texto concatenado de los campos de una carta filtrada,
+    utilizado tanto para calcular el hash como para generar el embedding.
+    """
+    campos = [
+        f"oracle_id: {carta_filtrada.get('oracle_id')}",
+        f"name: {carta_filtrada.get('name')}",
+        f"lang: {carta_filtrada.get('lang')}",
+        f"released_at: {carta_filtrada.get('released_at')}",
+        f"image_png: {carta_filtrada.get('image_png')}",
+        f"mana_cost: {carta_filtrada.get('mana_cost')}",
+        f"cmc: {carta_filtrada.get('cmc')}",
+        f"type_line: {carta_filtrada.get('type_line')}",
+        f"oracle_text: {carta_filtrada.get('oracle_text')}",
+        f"power: {carta_filtrada.get('power')}",
+        f"toughness: {carta_filtrada.get('toughness')}",
+        f"colors: {carta_filtrada.get('colors')}",
+        f"color_identity: {carta_filtrada.get('color_identity')}",
+        f"keywords: {carta_filtrada.get('keywords')}",
+        f"produced_mana: {carta_filtrada.get('produced_mana')}",
+        f"commander_legality: {carta_filtrada.get('commander_legality')}",
+        f"game_changer: {carta_filtrada.get('game_changer')}",
+        f"set_name: {carta_filtrada.get('set_name')}",
+        f"rarity: {carta_filtrada.get('rarity')}",
+        f"artist: {carta_filtrada.get('artist')}",
+        f"full_art: {carta_filtrada.get('full_art')}",
+        f"booster: {carta_filtrada.get('booster')}",
+        f"price_usd: {carta_filtrada.get('price_usd')}",
+    ]
+    # Incluir campos específicos de cartas doble cara si están presentes
+    if carta_filtrada.get('parent_id') is not None:
+        campos.insert(1, f"parent_id: {carta_filtrada.get('parent_id')}")
+        campos.insert(2, f"face_number: {carta_filtrada.get('face_number')}")
+    else:
+        campos.insert(1, f"face_number: {carta_filtrada.get('face_number')}")
+    return " ".join(campos)
+
+
+def _calcular_hash_carta(carta_filtrada: Dict[str, Any]) -> str:
+    """
+    Calcula un hash SHA-256 del contenido de una carta filtrada (sin el embedding).
+    Se usa para detectar si una carta ha cambiado entre ciclos de scraping.
+    """
+    texto = _generar_texto_embedding(carta_filtrada)
+    return hashlib.sha256(texto.encode('utf-8')).hexdigest()
+
+
+def _cargar_embeddings_previos(bulk_data_dir: Path) -> Dict[str, Dict[str, Any]]:
+    """
+    Carga el archivo JSON más reciente del ciclo anterior y construye un
+    diccionario indexado por (oracle_id, face_number) con el hash y el embedding
+    de cada carta.
+
+    Returns:
+        dict con clave "oracle_id|face_number" y valor {"hash": ..., "embedding": ...}
+    """
+    archivos = sorted(
+        bulk_data_dir.glob("scryfall_cards_*.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if not archivos:
+        return {}
+
+    archivo_previo = archivos[0]
+    try:
+        with open(archivo_previo, 'r', encoding='utf-8') as f:
+            cartas_previas = json.load(f)
+    except Exception:
+        return {}
+
+    cache: Dict[str, Dict[str, Any]] = {}
+    for carta in cartas_previas:
+        oid = carta.get('oracle_id', '')
+        fn = carta.get('face_number')
+        clave = f"{oid}|{fn}"
+        embedding = carta.get('embedding')
+        if embedding is not None:
+            # Recalcular hash desde los campos (sin embedding) para comparar
+            hash_carta = _calcular_hash_carta(carta)
+            cache[clave] = {"hash": hash_carta, "embedding": embedding}
+    return cache
+
+
+def _generar_embeddings_delta(
+    cartas: List[Dict[str, Any]],
+    cache_previo: Dict[str, Dict[str, Any]],
+    logger,
+) -> None:
+    """
+    Genera embeddings solo para cartas nuevas o modificadas.
+    Reutiliza los embeddings del ciclo anterior para las cartas sin cambios.
+    Modifica las cartas in-place añadiendo el campo 'embedding'.
+    """
+    reutilizados = 0
+    generados = 0
+    batch_texts = []  # textos pendientes de codificar
+    batch_indices = []  # índices en `cartas` de cada texto pendiente
+
+    for i, carta in enumerate(cartas):
+        oid = carta.get('oracle_id', '')
+        fn = carta.get('face_number')
+        clave = f"{oid}|{fn}"
+        hash_actual = _calcular_hash_carta(carta)
+
+        prev = cache_previo.get(clave)
+        if prev and prev["hash"] == hash_actual:
+            # Carta sin cambios: reutilizar embedding anterior
+            carta["embedding"] = prev["embedding"]
+            reutilizados += 1
+        else:
+            # Carta nueva o modificada: acumular para generar embedding
+            texto = _generar_texto_embedding(carta)
+            batch_texts.append(texto)
+            batch_indices.append(i)
+
+    # Generar embeddings en batch (mucho más eficiente que uno a uno)
+    if batch_texts:
+        logger.info(f"Generando embeddings para {len(batch_texts)} cartas nuevas/modificadas...")
+        vectors = model.encode(batch_texts, show_progress_bar=True, batch_size=256)
+        for idx, vec in zip(batch_indices, vectors):
+            cartas[idx]["embedding"] = vec.tolist()
+        generados = len(batch_texts)
+
+    logger.success(
+        f"Embeddings — reutilizados: {reutilizados}, "
+        f"generados: {generados}, "
+        f"total: {reutilizados + generados}"
+    )
+    print(f"Embeddings — reutilizados: {reutilizados}, generados: {generados}")
+
 
 def filtrar_carta(carta: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
@@ -93,39 +227,6 @@ def filtrar_carta(carta: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "cardmarket_url": carta.get("purchase_uris", {}).get("cardmarket")
             }
 
-            # Concatenar todos los campos excepto los excluidos
-            concat_text = " ".join([
-                f"oracle_id: {carta_filtrada.get('oracle_id')}",
-                f"parent_id: {carta_filtrada.get('parent_id')}",
-                f"face_number: {carta_filtrada.get('face_number')}",
-                f"name: {carta_filtrada.get('name')}",
-                f"lang: {carta_filtrada.get('lang')}",
-                f"released_at: {carta_filtrada.get('released_at')}",
-                f"image_png: {carta_filtrada.get('image_png')}",
-                f"mana_cost: {carta_filtrada.get('mana_cost')}",
-                f"cmc: {carta_filtrada.get('cmc')}",
-                f"type_line: {carta_filtrada.get('type_line')}",
-                f"oracle_text: {carta_filtrada.get('oracle_text')}",
-                f"power: {carta_filtrada.get('power')}",
-                f"toughness: {carta_filtrada.get('toughness')}",
-                f"colors: {carta_filtrada.get('colors')}",
-                f"color_identity: {carta_filtrada.get('color_identity')}",
-                f"keywords: {carta_filtrada.get('keywords')}",
-                f"produced_mana: {carta_filtrada.get('produced_mana')}",
-                f"commander_legality: {carta_filtrada.get('commander_legality')}",
-                f"game_changer: {carta_filtrada.get('game_changer')}",
-                f"set_name: {carta_filtrada.get('set_name')}",
-                f"rarity: {carta_filtrada.get('rarity')}",
-                f"artist: {carta_filtrada.get('artist')}",
-                f"full_art: {carta_filtrada.get('full_art')}",
-                f"booster: {carta_filtrada.get('booster')}",
-                f"price_usd: {carta_filtrada.get('price_usd')}"
-            ])
-
-            # Generar embedding
-            vector = model.encode(concat_text).tolist()
-            carta_filtrada["embedding"] = vector
-
             cartas_resultado.append(carta_filtrada)
     else:
         # Carta de una sola cara
@@ -161,38 +262,6 @@ def filtrar_carta(carta: Dict[str, Any]) -> List[Dict[str, Any]]:
             "price_usd_etched": carta.get("prices", {}).get("usd_etched"),
             "cardmarket_url": carta.get("purchase_uris", {}).get("cardmarket")
         }
-
-        # Concatenar todos los campos excepto los excluidos
-        concat_text = " ".join([
-                f"oracle_id: {carta_filtrada.get('oracle_id')}",
-                f"face_number: {carta_filtrada.get('face_number')}",
-                f"name: {carta_filtrada.get('name')}",
-                f"lang: {carta_filtrada.get('lang')}",
-                f"released_at: {carta_filtrada.get('released_at')}",
-                f"image_png: {carta_filtrada.get('image_png')}",
-                f"mana_cost: {carta_filtrada.get('mana_cost')}",
-                f"cmc: {carta_filtrada.get('cmc')}",
-                f"type_line: {carta_filtrada.get('type_line')}",
-                f"oracle_text: {carta_filtrada.get('oracle_text')}",
-                f"power: {carta_filtrada.get('power')}",
-                f"toughness: {carta_filtrada.get('toughness')}",
-                f"colors: {carta_filtrada.get('colors')}",
-                f"color_identity: {carta_filtrada.get('color_identity')}",
-                f"keywords: {carta_filtrada.get('keywords')}",
-                f"produced_mana: {carta_filtrada.get('produced_mana')}",
-                f"commander_legality: {carta_filtrada.get('commander_legality')}",
-                f"game_changer: {carta_filtrada.get('game_changer')}",
-                f"set_name: {carta_filtrada.get('set_name')}",
-                f"rarity: {carta_filtrada.get('rarity')}",
-                f"artist: {carta_filtrada.get('artist')}",
-                f"full_art: {carta_filtrada.get('full_art')}",
-                f"booster: {carta_filtrada.get('booster')}",
-                f"price_usd: {carta_filtrada.get('price_usd')}"
-            ])
-
-            # Generar embedding
-        vector = model.encode(concat_text).tolist()
-        carta_filtrada["embedding"] = vector
 
         cartas_resultado.append(carta_filtrada)
 
@@ -349,7 +418,21 @@ def descargar_cartas_scryfall() -> Optional[str]:
 
         cartas_filtradas = result
         logger.success(f"Deduplicado completado: {len(cartas_filtradas)} registros finales")
-        
+
+        # --- Mecanismo de delta: solo generar embeddings para cartas nuevas o modificadas ---
+        logger.info("Cargando embeddings del ciclo anterior para comparación delta...")
+        print("Cargando embeddings del ciclo anterior...")
+        cache_previo = _cargar_embeddings_previos(bulk_data_dir)
+        if cache_previo:
+            logger.info(f"Cache cargado: {len(cache_previo)} embeddings del ciclo anterior")
+            print(f"Cache cargado con {len(cache_previo)} embeddings previos")
+        else:
+            logger.info("No se encontró cache previo — se generarán todos los embeddings")
+            print("Sin cache previo, generando todos los embeddings...")
+
+        _generar_embeddings_delta(cartas_filtradas, cache_previo, logger)
+        # ---------------------------------------------------------------------------
+
         # Guardar en archivo local
 
         nombre_archivo = f"scryfall_cards_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
