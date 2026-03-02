@@ -1,4 +1,4 @@
-mport requests
+import requests
 import json
 
 import os
@@ -11,9 +11,6 @@ from typing import Dict, List, Any, Optional
 from pathlib import Path
 
 from sentence_transformers import SentenceTransformer
-
-# Intervalo entre ejecuciones del modo loop (en minutos)
-INTERVALO_MINUTOS = 10
 
 # Cargar el modelo de embeddings una sola vez
 model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
@@ -459,7 +456,7 @@ if __name__ == "__main__":
         else:
             print("\n✗ El scraping falló. Revisa el log para más detalles.")
     else:
-        print(f"Iniciando modo loop: ejecutando cada {INTERVALO_MINUTOS} minutos. Ctrl+C para detener.")
+        print("Iniciando modo loop: ejecutando cada 10 minutos. Ctrl+C para detener.")
         try:
             while True:
                 archivo = descargar_cartas_scryfall()
@@ -468,7 +465,7 @@ if __name__ == "__main__":
                 else:
                     print("\n✗ El scraping falló en esta iteración. Revisa el log.")
 
-                print(f"Esperando {INTERVALO_MINUTOS} minutos hasta la siguiente ejecución...\n")
-                time.sleep(INTERVALO_MINUTOS * 60)
+                print("Esperando 10 minutos hasta la siguiente ejecución...\n")
+                time.sleep(100 * 60)
         except KeyboardInterrupt:
             print("\nEjecución interrumpida por el usuario. Saliendo...")
