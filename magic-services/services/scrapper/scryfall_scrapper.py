@@ -206,7 +206,7 @@ def descargar_cartas_scryfall(model: SentenceTransformer) -> Optional[str]:
     """
     Descarga todas las cartas de Magic: The Gathering desde la API de Scryfall
     y las guarda en un archivo JSON con solo los campos necesarios.
-    "
+    """
     
 
     # Definir rutas
